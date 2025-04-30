@@ -1,0 +1,248 @@
+---
+#Prometheus ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: rag-system 
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 30s
+    
+    scrape_configs: 
+      #Scrape Istio Components 
+      - job_name: 'istiod'
+        kubernetes_sd_configs: 
+        - role: endpoints
+          namespaces:
+            names: ['istio-system']
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          action: keep
+          regex: 'istiod'
+      
+      #Scrape RAG services 
+      - job_name:'rag-services'
+        kubernetes_sd_configs:
+        - role: pod
+          namespaces:
+            names: ['rag-system']
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_pod_container_port_number]
+          action: keep
+          regex: '8000|8001|6333' #Ports for RAG/Qdrant services
+
+      #Scrape Qdrant Metrics
+      - job_name: 'qdrant'
+        static_configs: 
+        - targets: ['qdrant.rag-system.svc.cluster.local:6333']
+---
+#Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: prometheus
+  namespace: rag-system
+spec: 
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: prometheus
+  template:
+    metadata: 
+      labels: 
+        app: prometheus
+    spec: 
+      containers: 
+      - name: prometheus
+        image: prom/prometheus:v2.47.0
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus'
+          - '--web.enable-lifecycle'
+        ports: 
+        - containerPort: 9090
+        volumeMounts: 
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: prometheus-storage
+          mountPath: /prometheus
+      volumes:
+      - name: prometheus-config
+        configMap: 
+          name: prometheus-config
+      - name: prometheus-storage
+        emptyDir: {}
+---
+#Prometheus Service
+apiVersion: v1
+kind: Service
+metadata: 
+  name: prometheus
+  namespace: rag-system 
+spec: 
+  selector:
+    app: prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+
+---
+#Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: rag-system
+spec:
+  replicas: 1
+  selector: 
+    matchLabels: 
+      app: grafana 
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec: 
+      containers: 
+      - name: grafana
+        image: grafana/grafana:10.2.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: admin-password
+        volumeMounts:
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+      volumes:
+      - name: grafana-dashboards
+        configMap: 
+          name: grafana-dashboards
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+        
+---
+# Preconfigured Grafana Dashboards
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: grafana-dashboards
+  namespace: rag-system
+data: 
+  rag-system.json: |-
+    {
+    "dashboard": {
+      "title": "RAG System Metrics",
+      "panels": [
+        {
+          "title": "Query Latency",
+          "type": "graph",
+          "targets": [{
+            "expr": "histogram_quantile(0.99, sum(rate(rag_service_query_latency_seconds_bucket[1m])) by (le)",
+            "legendFormat": "P99"
+          }]
+        }, 
+        {
+          "title": "Qdrant Search Performance",
+          "type": "stat", 
+          "targets": [{
+            "expr": "rate(qdrant_search_duration_seconds_count[1m])",
+            "legendFormat": "Searches/sec"
+          }]
+        }
+      ]
+    }
+    }
+---
+# Grafana Datasource (ConfigMap)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: rag-system
+data:
+  prometheus.yaml: |-
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus:9090
+      access: proxy
+      isDefault: true
+
+---
+  # Jaeger Deployment
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: jaeger
+    namespace: rag-system
+  spec: 
+    replicas: 1
+    selector:
+      matchLabels:
+        app: jaeger
+    template:
+      metadata:
+        labels: 
+          app: jaeger
+      spec: 
+        containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.48
+          ports:
+          - containerPort: 16686 #UI
+          - containerPort: 14268 #Collector 
+          env:
+          - name: COLLECTOR_ZIPKIN_HOST_PORT
+            value: ":9411"
+          - name: MEMORY_MAX_TRACES
+            value: "100000"
+
+---
+# Jaeger Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: rag-system 
+spec: 
+  selector:
+    app: jaeger
+  ports: 
+  - name: ui
+    port: 16686
+  - name: collector
+    port: 14268
+    targetPort: 14268
+
+---
+# Istio Telemetry 
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry 
+metadata:
+  name: rag-telemetry
+  namespace: rag-system
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+  tracing:
+    - providers:
+      - name: jaeger
+      randomSamplingPercentage: 100 #Sample all traces
