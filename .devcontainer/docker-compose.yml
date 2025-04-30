@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  rag-dev:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+    privileged: true #required for Minikube
+    volumes: 
+      - ..:/workspace
+    cap_add: 
+      - NET_ADMIN
+    command: sleep infinity 
