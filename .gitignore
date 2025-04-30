@@ -175,3 +175,4 @@ cython_debug/
 
 minikube-linux-amd64
 istio-1.25.2/
+kubectl
