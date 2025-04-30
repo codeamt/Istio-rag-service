@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment 
+metadata: 
+  name: scraper
+  namespace: rag-system 
+spec: 
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: scraper
+  template:
+    spec:
+      containers:
+        - name: scraper 
+          image: <local dir> 
+          envFrom:
+          - sectretRef: 
+              name: api-tokens
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: scraper
+  namespace: rag-system 
+spec:
+  selector:
+    app: scraper 
+  ports:
+  - port: 8000
+    targetPort: 8000

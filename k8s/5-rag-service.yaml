@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  namespace: rag-system
+spec:
+  selector:
+    matchLabels:
+      app: rag-service
+  template: 
+    spec: 
+      containers:
+      - name: rag-service
+        image: <IMAGE>
+        env:
+        - name: VLLM_ENDPOINT
+          value: "http://vllm:8000"
+        - name: QDRANT_HOST
+          value: "qdrant"
