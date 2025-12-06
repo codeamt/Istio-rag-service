@@ -2,6 +2,15 @@
 
 A Kubernetes-based Retrieval-Augmented Generation (RAG) service that scrapes social media content, indexes it in a vector database, and provides an API for querying with an LLM.
 
+This service has been enhanced with modern Python development practices including:
+- Configuration management using environment variables
+- Comprehensive logging with detailed error reporting
+- Rate limiting for API calls
+- Data deduplication using SHA checksums
+- Concurrent processing for improved performance
+- Batch processing for efficient indexing
+- Pydantic validation for API response validation
+
 ## Table of Contents
 
 - [Architecture](#architecture)
@@ -158,9 +167,24 @@ make health-check
 
 ### Environment Variables
 
-The services require the following environment variables:
+The services support comprehensive configuration through environment variables. All settings can also be configured via `.env` files.
 
+#### Scraper Service Configuration:
 - `TWITTER_TOKEN` - Bearer token for Twitter API v2 access
+- `TWITTER_MAX_REQUESTS` - Maximum Twitter API requests (default: 300)
+- `TWITTER_TIME_WINDOW` - Time window for Twitter rate limiting (default: 900 seconds)
+- `THREADS_MAX_REQUESTS` - Maximum Threads API requests (default: 100)
+- `THREADS_TIME_WINDOW` - Time window for Threads rate limiting (default: 3600 seconds)
+- `BLUESKY_MAX_REQUESTS` - Maximum Bluesky API requests (default: 3000)
+- `BLUESKY_TIME_WINDOW` - Time window for Bluesky rate limiting (default: 300 seconds)
+- `BATCH_SIZE` - Number of posts to process in batches (default: 10)
+- `HTTP_TIMEOUT` - HTTP request timeout in seconds (default: 30)
+- `LOG_LEVEL` - Logging level (default: INFO)
+
+#### RAG Service Configuration:
+- `HTTP_TIMEOUT` - HTTP request timeout in seconds (default: 30)
+- `MAX_TOKENS` - Maximum tokens for LLM responses (default: 500)
+- `LOG_LEVEL` - Logging level (default: INFO)
 
 ### Kubernetes Secrets
 

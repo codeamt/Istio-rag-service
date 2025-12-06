@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field, validator
 import httpx
 import os
 import logging
@@ -49,8 +49,23 @@ class LLMResponse(BaseModel):
 app = FastAPI()
 
 class QueryRequest(BaseModel):
-    query: str
-    max_results: int = 5
+    query: str = Field(..., min_length=1, max_length=1000)
+    max_results: int = Field(5, ge=1, le=50)
+    
+    @validator('query')
+    def validate_query(cls, v):
+        # Remove any potentially harmful characters
+        sanitized = v.strip()
+        if not sanitized:
+            raise ValueError("Query cannot be empty")
+        return sanitized
+
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for the RAG service.
+    """
+    return {"status": "healthy", "service": "rag"}
 
 @app.post("/query")
 async def query_rag(request: QueryRequest):
@@ -90,10 +105,10 @@ async def query_rag(request: QueryRequest):
                     logger.warning("No documents found for query")
                     raise HTTPException(status_code=404, detail="No documents found")
             except httpx.RequestError as e:
-                logger.error(f"Error connecting to Qdrant: {e}", exc_info=True)
+                logger.error(f"Error connecting to Qdrant: {str(e)[:100]}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error retrieving documents")
             except Exception as e:
-                logger.error(f"Error retrieving documents: {e}", exc_info=True)
+                logger.error(f"Error retrieving documents: {str(e)[:100]}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error retrieving documents")
 
         #2 Generate response using LLM
@@ -114,16 +129,16 @@ async def query_rag(request: QueryRequest):
             logger.info("Successfully generated response from LLM")
             return {"answer": llm_data.text}
         except httpx.RequestError as e:
-            logger.error(f"Error connecting to vLLM: {e}", exc_info=True)
+            logger.error(f"Error connecting to vLLM: {str(e)[:100]}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error generating response")
         except Exception as e:
-            logger.error(f"Error generating response: {e}", exc_info=True)
+            logger.error(f"Error generating response: {str(e)[:100]}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error generating response")
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in query_rag: {e}", exc_info=True)
+        logger.error(f"Unexpected error in query_rag: {str(e)[:100]}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 async def get_embedding(text: str) -> list[float]:
@@ -145,8 +160,8 @@ async def get_embedding(text: str) -> list[float]:
             logger.debug(f"Successfully obtained embedding with {len(embedding_data.embedding)} dimensions")
             return embedding_data.embedding
     except httpx.RequestError as e:
-        logger.error(f"HTTP error while getting embedding: {e}", exc_info=True)
-        raise Exception(f"Error connecting to embedding service: {e}")
+        logger.error(f"HTTP error while getting embedding: {str(e)[:100]}", exc_info=True)
+        raise Exception(f"Error connecting to embedding service")
     except Exception as e:
-        logger.error(f"Error while getting embedding: {e}", exc_info=True)
-        raise Exception(f"Error processing embedding: {e}")
+        logger.error(f"Error while getting embedding: {str(e)[:100]}", exc_info=True)
+        raise Exception(f"Error processing embedding")

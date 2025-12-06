@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field, BaseSettings
+from pydantic import BaseModel, Field, BaseSettings, validator
 import httpx
 import hashlib
 import os
@@ -178,8 +178,31 @@ class LLMResponse(BaseModel):
 app = FastAPI()
 
 class ScrapeRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=280)
     platforms: list[str] = ["twitter", "bluesky", "threads"]
+    
+    @validator('platforms')
+    def validate_platforms(cls, v):
+        allowed_platforms = ["twitter", "bluesky", "threads"]
+        for platform in v:
+            if platform not in allowed_platforms:
+                raise ValueError(f"Invalid platform: {platform}. Allowed platforms: {allowed_platforms}")
+        return v
+    
+    @validator('query')
+    def validate_query(cls, v):
+        # Remove any potentially harmful characters
+        sanitized = v.strip()
+        if not sanitized:
+            raise ValueError("Query cannot be empty")
+        return sanitized
+
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for the scraper service.
+    """
+    return {"status": "healthy", "service": "scraper"}
 
 @app.post("/scrape")
 async def scrape(request: ScrapeRequest, background_tasks: BackgroundTasks):
@@ -261,10 +284,10 @@ async def scrape_twitter(query: str) -> list[dict]:
                 "source": "twitter"
             } for tweet in twitter_response.data]
     except httpx.RequestError as e:
-        logger.error(f"HTTP error while scraping Twitter: {e}", exc_info=True)
+        logger.error(f"HTTP error while scraping Twitter: {str(e)[:100]}", exc_info=True)
         return []
     except Exception as e:
-        logger.error(f"Unexpected error while scraping Twitter: {e}", exc_info=True)
+        logger.error(f"Unexpected error while scraping Twitter: {str(e)[:100]}", exc_info=True)
         return []
 
 # Threads Unofficial API (Could Break)
@@ -297,10 +320,10 @@ async def scrape_threads(query: str) -> list[dict]:
                 "source": "threads"
             } for post in threads_response.data.search.edges]
     except httpx.RequestError as e:
-        logger.error(f"HTTP error while scraping Threads: {e}", exc_info=True)
+        logger.error(f"HTTP error while scraping Threads: {str(e)[:100]}", exc_info=True)
         return []
     except Exception as e:
-        logger.error(f"Unexpected error while scraping Threads: {e}", exc_info=True)
+        logger.error(f"Unexpected error while scraping Threads: {str(e)[:100]}", exc_info=True)
         return []
 
 # Bluesky
@@ -331,10 +354,10 @@ async def scrape_bluesky(query: str) -> list[dict]:
                 "source": "bluesky"
             } for post in bluesky_response.posts]
     except httpx.RequestError as e:
-        logger.error(f"HTTP error while scraping Bluesky: {e}", exc_info=True)
+        logger.error(f"HTTP error while scraping Bluesky: {str(e)[:100]}", exc_info=True)
         return []
     except Exception as e:
-        logger.error(f"Unexpected error while scraping Bluesky: {e}", exc_info=True)
+        logger.error(f"Unexpected error while scraping Bluesky: {str(e)[:100]}", exc_info=True)
         return []
 
 async def index_to_qdrant(posts: list[dict]):
@@ -385,10 +408,10 @@ async def index_to_qdrant(posts: list[dict]):
                         batch_points.append(point)
                         
                     except httpx.RequestError as e:
-                        logger.error(f"HTTP error while getting embedding for post {post['id']}: {e}")
+                        logger.error(f"HTTP error while getting embedding for post {post['id']}: {str(e)[:100]}")
                         continue
                     except Exception as e:
-                        logger.error(f"Error while getting embedding for post {post['id']}: {e}", exc_info=True)
+                        logger.error(f"Error while getting embedding for post {post['id']}: {str(e)[:100]}", exc_info=True)
                         continue
                 
                 # Store batch in Qdrant
@@ -409,9 +432,9 @@ async def index_to_qdrant(posts: list[dict]):
                         total_indexed += len(batch_points)
                         logger.info(f"Successfully indexed batch {batch_num}/{total_batches} with {len(batch_points)} posts")
                     except httpx.RequestError as e:
-                        logger.error(f"HTTP error while indexing batch {batch_num}: {e}")
+                        logger.error(f"HTTP error while indexing batch {batch_num}: {str(e)[:100]}")
                     except Exception as e:
-                        logger.error(f"Error while indexing batch {batch_num}: {e}", exc_info=True)
+                        logger.error(f"Error while indexing batch {batch_num}: {str(e)[:100]}", exc_info=True)
                 else:
                     logger.warning(f"No valid points to index in batch {batch_num}")
             
