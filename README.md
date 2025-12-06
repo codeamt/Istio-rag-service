@@ -1,10 +1,11 @@
 # Istio RAG Service
 
-[![CI/CD](https://github.com/USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/REPO_NAME/actions)
+[![CI/CD](https://github.com/codeamt
+/Istio-rag-service/actions/workflows/ci.yml/badge.svg)](https://github.com/codeamt/Istio-rag-service/actions)
 [![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-009688.svg)](https://fastapi.tiangolo.com/)
-[![Security](https://img.shields.io/badge/security-bandit%20%26%20safety-green.svg)](https://github.com/USERNAME/REPO_NAME/actions)
+[![Security](https://img.shields.io/badge/security-bandit%20%26%20safety-green.svg)](https://github.com/codeamtE/Istio-rag-service/actions)
 [![UV](https://img.shields.io/badge/uv-package%20manager-orange)](https://github.com/astral-sh/uv)
 
 A Kubernetes-based Retrieval-Augmented Generation (RAG) service that scrapes social media content, indexes it in a vector database, and provides an API for querying with an LLM.
