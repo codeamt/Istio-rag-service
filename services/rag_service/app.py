@@ -2,6 +2,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import httpx
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -14,36 +19,91 @@ async def query_rag(request: QueryRequest):
     """
     Query the RAG Service with a user query.
     """
-    #1 Retrieve documents from Qdrant
-    async with httpx.AsyncClient() as client:
-        vector_response = await client.post(
-            f"http://qdrant:6333/collections/posts/points/search",
-            json={
-                "vector": await get_embedding(request.query), 
-                "limit": request.max_results,
-            }
-        )
-        documents = [hit["payload"] for hit in vector_response.json()["result"]]
-        if not documents:
-            raise HTTPException(status_code=404, detail="No documents found")
+    try:
+        #1 Retrieve documents from Qdrant
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                embedding = await get_embedding(request.query)
+            except Exception as e:
+                logger.error(f"Error getting embedding: {e}")
+                raise HTTPException(status_code=500, detail="Error processing query embedding")
+            
+            try:
+                vector_response = await client.post(
+                    "http://qdrant:6333/collections/posts/points/search",
+                    json={
+                        "vector": embedding, 
+                        "limit": request.max_results,
+                    }
+                )
+                vector_response.raise_for_status()
+                data = vector_response.json()
+                
+                if "result" not in data:
+                    logger.error("Unexpected response structure from Qdrant")
+                    raise HTTPException(status_code=500, detail="Error retrieving documents")
+                    
+                documents = [hit["payload"] for hit in data["result"]]
+                if not documents:
+                    raise HTTPException(status_code=404, detail="No documents found")
+            except httpx.RequestError as e:
+                logger.error(f"Error connecting to Qdrant: {e}")
+                raise HTTPException(status_code=500, detail="Error retrieving documents")
+            except Exception as e:
+                logger.error(f"Error retrieving documents: {e}")
+                raise HTTPException(status_code=500, detail="Error retrieving documents")
 
-    #2 Generate response using LLM
-    llm_response = await client.post(
-        "http://vllm:8000/generate", 
-        json={
-            "prompt": f"Answer this question: {request.query}\nContext: {documents}",
-            "max_tokens": 500,
-        }
-    )
-    return {"answer": llm_response.json()["text"]}
+        #2 Generate response using LLM
+        try:
+            llm_response = await client.post(
+                "http://vllm:8000/generate", 
+                json={
+                    "prompt": f"Answer this question: {request.query}\nContext: {documents}",
+                    "max_tokens": 500,
+                }
+            )
+            llm_response.raise_for_status()
+            data = llm_response.json()
+            
+            if "text" not in data:
+                logger.error("Unexpected response structure from vLLM")
+                raise HTTPException(status_code=500, detail="Error generating response")
+                
+            return {"answer": data["text"]}
+        except httpx.RequestError as e:
+            logger.error(f"Error connecting to vLLM: {e}")
+            raise HTTPException(status_code=500, detail="Error generating response")
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            raise HTTPException(status_code=500, detail="Error generating response")
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in query_rag: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 async def get_embedding(text: str) -> list[float]:
     """
     Get the embedding from the embedding service.
     """
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://embedding-service:8000/embed",
-            json={"text": text}
-        )
-        return response.json()["embedding"]
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "http://embedding-service:8000/embed",
+                json={"text": text}
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if "embedding" not in data:
+                logger.error("No embedding found in response")
+                raise Exception("No embedding found in response")
+                
+            return data["embedding"]
+    except httpx.RequestError as e:
+        logger.error(f"HTTP error while getting embedding: {e}")
+        raise Exception(f"Error connecting to embedding service: {e}")
+    except Exception as e:
+        logger.error(f"Error while getting embedding: {e}")
+        raise Exception(f"Error processing embedding: {e}")
