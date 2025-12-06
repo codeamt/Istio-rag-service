@@ -12,9 +12,9 @@ spec:
     spec:
       containers:
         - name: scraper 
-          image: <local dir> 
+          image: codeamt/istio-scraper 
           envFrom:
-          - sectretRef: 
+          - secretRef: 
               name: api-tokens
 ---
 apiVersion: v1

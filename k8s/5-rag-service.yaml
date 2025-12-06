@@ -11,7 +11,7 @@ spec:
     spec: 
       containers:
       - name: rag-service
-        image: <IMAGE>
+        image: codeamt/istio-rag
         env:
         - name: VLLM_ENDPOINT
           value: "http://vllm:8000"
