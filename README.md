@@ -1,7 +1,6 @@
 # Istio RAG Service
 
-[![CI/CD](https://github.com/codeamt
-/Istio-rag-service/actions/workflows/ci.yml/badge.svg)](https://github.com/codeamt/Istio-rag-service/actions)
+[![CI/CD](https://github.com/codeamt/Istio-rag-service/actions/workflows/ci.yml/badge.svg)](https://github.com/codeamt/Istio-rag-service/actions)
 [![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-009688.svg)](https://fastapi.tiangolo.com/)
