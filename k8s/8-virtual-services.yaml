@@ -1,0 +1,54 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: rag-services
+  namespace: rag-system
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - rag-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/query
+    route:
+    - destination:
+        host: rag-service
+        port:
+          number: 8000
+  - match:
+    - uri:
+        prefix: /api/scrape
+    route:
+    - destination:
+        host: scraper
+        port:
+          number: 8000
+  - match:
+    - uri:
+        prefix: /health
+    route:
+    - destination:
+        host: rag-service
+        port:
+          number: 8000
+  - match:
+    - uri:
+        prefix: /scrape
+    route:
+    - destination:
+        host: scraper
+        port:
+          number: 8000
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: rag-services
+  namespace: rag-system
+spec:
+  host: "*.rag-system.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

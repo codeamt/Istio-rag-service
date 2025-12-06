@@ -1,5 +1,5 @@
 start-minikube:
-	minikube start --driver=docker --cpus=4 --memory=8192 --kubernetes-version=1.27.0
+	minikube start --driver=docker --cpus=4 --memory=6144 --kubernetes-version=1.28.0
 
 install-istio:
 	istioctl install --set profile=demo -y
@@ -9,7 +9,15 @@ microservice-container-build:
 	docker build -t codeamt/istio-scraper ./services/scraper_service
 
 deploy:
-	kubectl apply -f ./k8s/
+	kubectl apply -f k8s/0-namespace.yaml
+	kubectl apply -f k8s/1-istio-mtls.yaml
+	kubectl apply -f k8s/2-vllm.yaml
+	kubectl apply -f k8s/3-qdrant.yaml
+	kubectl apply -f k8s/4-scraper-service.yaml
+	kubectl apply -f k8s/5-rag-service.yaml
+	kubectl apply -f k8s/6-observability.yaml
+	kubectl apply -f k8s/7-network-policies.yaml
+	kubectl apply -f k8s/8-virtual-services.yaml
 	kubectl wait --for=condition=available --timeout=300s deployment/istio-ingressgateway -n istio-system
 	@echo "Minikube is ready! Access RAG app at http://localhost:8080/api/query"
 

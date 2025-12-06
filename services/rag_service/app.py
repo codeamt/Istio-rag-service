@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, BaseSettings, Field, validator
+from pydantic import BaseModel, Field, validator
+from pydantic_settings import BaseSettings
 import httpx
 import os
 import logging

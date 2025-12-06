@@ -5,6 +5,8 @@ kubectl apply -f k8s/0-namespace.yaml
 kubectl apply -f k8s/1-istio-mtls.yaml
 kubectl apply -f k8s/2-vllm.yaml
 kubectl apply -f k8s/3-qdrant.yaml
+kubectl apply -f k8s/7-network-policies.yaml
+kubectl apply -f k8s/8-virtual-services.yaml
 
 # Build and deploy Python services 
 docker build -t rag-service ./services/rag_service

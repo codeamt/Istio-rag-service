@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![Security](https://img.shields.io/badge/security-bandit%20%26%20safety-green.svg)](https://github.com/USERNAME/REPO_NAME/actions)
+[![UV](https://img.shields.io/badge/uv-package%20manager-orange)](https://github.com/astral-sh/uv)
 
 A Kubernetes-based Retrieval-Augmented Generation (RAG) service that scrapes social media content, indexes it in a vector database, and provides an API for querying with an LLM.
 
@@ -37,6 +38,14 @@ The system consists of multiple microservices orchestrated with Kubernetes and I
 4. **vLLM**: High-throughput LLM inference engine
 5. **Embedding Service**: Generates vector embeddings for text (referenced but not included in this repo)
 
+The Kubernetes configuration includes:
+- Namespace and RBAC definitions
+- Istio Gateway and security configurations
+- Network policies for secure communication
+- Virtual services for traffic routing
+- Observability components (Prometheus, Grafana, Jaeger, Kiali)
+- Service definitions for all components
+
 ## Services
 
 ### Scraper Service
@@ -68,19 +77,20 @@ The system consists of multiple microservices orchestrated with Kubernetes and I
 
 ```mermaid
 graph TD
-    A[Client] --> B[API Gateway]
-    B --> C[RAG Service]
-    B --> D[Scraper Service]
+    A[Client] --> B[Istio Gateway]
+    B --> C[VirtualService]
+    C --> D[RAG Service]
+    C --> E[Scraper Service]
     
-    C --> E[Qdrant DB]
-    C --> F[vLLM Service]
-    C --> G[Embedding Service]
+    D --> F[Qdrant DB]
+    D --> G[vLLM Service]
+    D --> H[Embedding Service]
     
-    D --> E
-    D --> G
-    D --> H[Twitter API]
-    D --> I[Threads API]
-    D --> J[Bluesky API]
+    E --> F
+    E --> H
+    E --> I[Twitter API]
+    E --> J[Threads API]
+    E --> K[Bluesky API]
     
     subgraph Kubernetes Cluster
         B
@@ -89,12 +99,13 @@ graph TD
         E
         F
         G
+        H
     end
     
     subgraph External Services
-        H
         I
         J
+        K
     end
 ```
 
@@ -124,16 +135,18 @@ For production, you would use a more capable model.
 ### Using UV (Recommended)
 
 1. Install [UV](https://github.com/astral-sh/uv) (Python package manager)
-2. Create and activate a virtual environment:
+2. Install dependencies for each service:
    ```bash
-   uv venv .venv
-   source .venv/bin/activate
+   # Install base dependencies
+   uv pip install -e ./services/rag_service -e ./services/scraper_service
+   
+   # Or install with specific extras
+   uv pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]  # For testing
+   uv pip install -e ./services/rag_service[security] -e ./services/scraper_service[security]  # For security scanning
+   uv pip install -e ./services/rag_service[all] -e ./services/scraper_service[all]  # All dependencies
    ```
-3. Install dependencies for each service:
-   ```bash
-   cd services/rag_service && uv pip install -e . && cd ../..
-   cd services/scraper_service && uv pip install -e . && cd ../..
-   ```
+
+3. UV automatically manages a virtual environment, so no need to activate/deactivate
 
 ### Traditional pip Setup
 
@@ -144,9 +157,16 @@ For production, you would use a more capable model.
    ```
 2. Install dependencies for each service:
    ```bash
-   cd services/rag_service && pip install -e . && cd ../..
-   cd services/scraper_service && pip install -e . && cd ../..
+   # Install base dependencies
+   pip install -e ./services/rag_service -e ./services/scraper_service
+   
+   # Or install with specific extras
+   pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]  # For testing
+   pip install -e ./services/rag_service[security] -e ./services/scraper_service[security]  # For security scanning
+   pip install -e ./services/rag_service[all] -e ./services/scraper_service[all]  # All dependencies
    ```
+
+>Note: Dependencies are now managed through pyproject.toml files with optional dependency groups. Separate requirements.txt files have been removed.
 
 ### Installing Test Dependencies
 
@@ -157,10 +177,6 @@ To run tests, install the test dependencies:
 uv pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]
 
 # Or using traditional pip
-cd services/rag_service && pip install -e .[test] && cd ../..
-cd services/scraper_service && pip install -e .[test] && cd ../..
-
-# Or install both with pip
 pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]
 ```
 
@@ -202,6 +218,8 @@ make health-check
    kubectl apply -f k8s/4-scraper-service.yaml
    kubectl apply -f k8s/5-rag-service.yaml
    kubectl apply -f k8s/6-observability.yaml
+   kubectl apply -f k8s/7-network-policies.yaml
+   kubectl apply -f k8s/8-virtual-services.yaml
    ```
 
 2. Build and push Docker images for the services:
@@ -296,8 +314,11 @@ The project includes automated security scanning in the CI pipeline:
 To run security scans locally:
 
 ```bash
-# Install security scanning tools
-pip install -r requirements-security.txt
+# Using UV (recommended)
+uv pip install -e ./services/rag_service[security] -e ./services/scraper_service[security]
+
+# Or using traditional pip
+pip install -e ./services/rag_service[security] -e ./services/scraper_service[security]
 
 # Run bandit scan
 bandit -r services/
@@ -312,13 +333,19 @@ safety check
 To run the tests for both services:
 
 ```bash
-# Run all tests
+# Run all tests with UV (recommended)
+uv run python run_tests.py
+
+# Or run tests manually with pytest using UV
+uv run python -m pytest tests/ -v
+
+# Run tests for a specific service with UV
+uv run python -m pytest tests/test_rag_service.py -v
+uv run python -m pytest tests/test_scraper_service.py -v
+
+# Or use traditional methods
 python run_tests.py
-
-# Or run tests manually with pytest
 pytest tests/ -v
-
-# Run tests for a specific service
 pytest tests/test_rag_service.py -v
 pytest tests/test_scraper_service.py -v
 
@@ -326,8 +353,29 @@ pytest tests/test_scraper_service.py -v
 python check_test_syntax.py
 ```
 
+## Configuration Verification
+
+Before deploying, you can verify that all configuration files are properly structured:
+
+```bash
+# Using UV (recommended)
+uv pip install -e ./services/rag_service[verify] -e ./services/scraper_service[verify]
+python verify-config.py
+
+# Or using traditional pip
+pip install -e ./services/rag_service[verify] -e ./services/scraper_service[verify]
+python verify-config.py
+
+# Or install all dependencies
+uv pip install -e ./services/rag_service[all] -e ./services/scraper_service[all]
+python verify-config.py
+```
+
 ## Troubleshooting
 
 - Check pod status: `kubectl get pods -n rag-system`
 - Check service logs: `kubectl logs -n rag-system deploy/<service-name>`
+- Check service status: `kubectl get services -n rag-system`
 - Check Istio sidecar status: `istioctl proxy-status`
+- Check virtual services: `kubectl get virtualservices -n rag-system`
+- Check destination rules: `kubectl get destinationrules -n rag-system`

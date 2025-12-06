@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field, BaseSettings, validator
+from pydantic import BaseModel, Field, validator
+from pydantic_settings import BaseSettings
 import httpx
 import hashlib
 import os
