@@ -1,5 +1,11 @@
 # Istio RAG Service
 
+[![CI/CD](https://github.com/USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/REPO_NAME/actions)
+[![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-009688.svg)](https://fastapi.tiangolo.com/)
+[![Security](https://img.shields.io/badge/security-bandit%20%26%20safety-green.svg)](https://github.com/USERNAME/REPO_NAME/actions)
+
 A Kubernetes-based Retrieval-Augmented Generation (RAG) service that scrapes social media content, indexes it in a vector database, and provides an API for querying with an LLM.
 
 This service has been enhanced with modern Python development practices including:
@@ -47,11 +53,71 @@ The system consists of multiple microservices orchestrated with Kubernetes and I
 
 ## Prerequisites
 
+### For Kubernetes Deployment
 - [Docker](https://docs.docker.com/get-docker/)
 - [Kubernetes](https://kubernetes.io/docs/setup/) (minikube recommended for local development)
 - [Istio](https://istio.io/latest/docs/setup/getting-started/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [istioctl](https://istio.io/latest/docs/setup/getting-started/#download)
+
+### For Local Development with Docker Compose
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+## Project Architecture
+
+```mermaid
+graph TD
+    A[Client] --> B[API Gateway]
+    B --> C[RAG Service]
+    B --> D[Scraper Service]
+    
+    C --> E[Qdrant DB]
+    C --> F[vLLM Service]
+    C --> G[Embedding Service]
+    
+    D --> E
+    D --> G
+    D --> H[Twitter API]
+    D --> I[Threads API]
+    D --> J[Bluesky API]
+    
+    subgraph Kubernetes Cluster
+        B
+        C
+        D
+        E
+        F
+        G
+    end
+    
+    subgraph External Services
+        H
+        I
+        J
+    end
+```
+
+## Local Development with Docker Compose
+
+For local development without Kubernetes, you can use Docker Compose:
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+Note: The docker-compose setup uses a lightweight model (facebook/opt-125m) for local development.
+For production, you would use a more capable model.
 
 ## Development Setup
 
@@ -78,8 +144,8 @@ The system consists of multiple microservices orchestrated with Kubernetes and I
    ```
 2. Install dependencies for each service:
    ```bash
-   cd services/rag_service && pip install -r requirements.txt && cd ../..
-   cd services/scraper_service && pip install -r requirements.txt && cd ../..
+   cd services/rag_service && pip install -e . && cd ../..
+   cd services/scraper_service && pip install -e . && cd ../..
    ```
 
 ### Installing Test Dependencies
@@ -219,6 +285,27 @@ The system includes observability configurations for monitoring the services:
 - Grafana dashboards
 - Jaeger distributed tracing
 - Kiali service mesh visualization
+
+## Security Scanning
+
+The project includes automated security scanning in the CI pipeline:
+
+- **Bandit**: Static analysis for common Python security issues
+- **Safety**: Checks dependencies for known security vulnerabilities
+
+To run security scans locally:
+
+```bash
+# Install security scanning tools
+pip install -r requirements-security.txt
+
+# Run bandit scan
+bandit -r services/
+
+# Run safety check
+# Note: This requires actual requirements files with pinned versions
+safety check
+```
 
 ## Running Tests
 

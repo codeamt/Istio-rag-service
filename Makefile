@@ -19,4 +19,17 @@ health-check:
 log-check:
 	kubectl logs deploy/scraper -n rag-system
 
+# Docker Compose commands for local development
+compose-up:
+	docker-compose up -d
+
+compose-down:
+	docker-compose down
+
+compose-logs:
+	docker-compose logs -f
+
+compose-ps:
+	docker-compose ps
+
 all: start-minikube install-istio microservice-container-build deploy health-check

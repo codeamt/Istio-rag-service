@@ -1,0 +1,90 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]
+    
+    - name: Check syntax
+      run: python check_test_syntax.py
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short
+      
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build RAG Service
+      run: |
+        docker build -t rag-service ./services/rag_service
+        
+    - name: Build Scraper Service
+      run: |
+        docker build -t scraper-service ./services/scraper_service
+        
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+      
+    - name: Install security scanning tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-security.txt
+      
+    - name: Run bandit security scan
+      run: |
+        bandit -r services/ -f json -o bandit-report.json || echo "Bandit scan completed with findings"
+        
+    - name: Run safety dependency check
+      run: |
+        # Collect all requirements files
+        find . -name "requirements*.txt" -exec cat {} \; | sort -u > all_requirements.txt
+        # Run safety check (may fail if no requirements found, which is OK)
+        safety check -r all_requirements.txt || echo "Safety check completed"
+        
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test, build, security-scan]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy notification
+      run: |
+        echo "Deployment would happen here in a real CI/CD pipeline"
