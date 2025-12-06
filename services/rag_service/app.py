@@ -3,10 +3,24 @@ from pydantic import BaseModel
 import httpx
 import os
 import logging
+from typing import List, Dict, Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Pydantic models for API response validation
+class EmbeddingResponse(BaseModel):
+    embedding: List[float]
+    
+class QdrantSearchResultHit(BaseModel):
+    payload: Dict[str, Any]
+    
+class QdrantSearchResult(BaseModel):
+    result: List[QdrantSearchResultHit]
+    
+class LLMResponse(BaseModel):
+    text: str
 
 app = FastAPI()
 
@@ -37,13 +51,9 @@ async def query_rag(request: QueryRequest):
                     }
                 )
                 vector_response.raise_for_status()
-                data = vector_response.json()
-                
-                if "result" not in data:
-                    logger.error("Unexpected response structure from Qdrant")
-                    raise HTTPException(status_code=500, detail="Error retrieving documents")
-                    
-                documents = [hit["payload"] for hit in data["result"]]
+                # Validate response structure
+                qdrant_response = QdrantSearchResult(**vector_response.json())
+                documents = [hit.payload for hit in qdrant_response.result]
                 if not documents:
                     raise HTTPException(status_code=404, detail="No documents found")
             except httpx.RequestError as e:
@@ -63,13 +73,9 @@ async def query_rag(request: QueryRequest):
                 }
             )
             llm_response.raise_for_status()
-            data = llm_response.json()
-            
-            if "text" not in data:
-                logger.error("Unexpected response structure from vLLM")
-                raise HTTPException(status_code=500, detail="Error generating response")
-                
-            return {"answer": data["text"]}
+            # Validate response structure
+            llm_data = LLMResponse(**llm_response.json())
+            return {"answer": llm_data.text}
         except httpx.RequestError as e:
             logger.error(f"Error connecting to vLLM: {e}")
             raise HTTPException(status_code=500, detail="Error generating response")
@@ -94,13 +100,9 @@ async def get_embedding(text: str) -> list[float]:
                 json={"text": text}
             )
             response.raise_for_status()
-            data = response.json()
-            
-            if "embedding" not in data:
-                logger.error("No embedding found in response")
-                raise Exception("No embedding found in response")
-                
-            return data["embedding"]
+            # Validate response structure
+            embedding_data = EmbeddingResponse(**response.json())
+            return embedding_data.embedding
     except httpx.RequestError as e:
         logger.error(f"HTTP error while getting embedding: {e}")
         raise Exception(f"Error connecting to embedding service: {e}")
