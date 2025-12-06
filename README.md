@@ -82,6 +82,22 @@ The system consists of multiple microservices orchestrated with Kubernetes and I
    cd services/scraper_service && pip install -r requirements.txt && cd ../..
    ```
 
+### Installing Test Dependencies
+
+To run tests, install the test dependencies:
+
+```bash
+# Using UV (recommended)
+uv pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]
+
+# Or using traditional pip
+cd services/rag_service && pip install -e .[test] && cd ../..
+cd services/scraper_service && pip install -e .[test] && cd ../..
+
+# Or install both with pip
+pip install -e ./services/rag_service[test] -e ./services/scraper_service[test]
+```
+
 ## Deployment
 
 ### Option 1: Using Makefile (Recommended)
@@ -203,6 +219,25 @@ The system includes observability configurations for monitoring the services:
 - Grafana dashboards
 - Jaeger distributed tracing
 - Kiali service mesh visualization
+
+## Running Tests
+
+To run the tests for both services:
+
+```bash
+# Run all tests
+python run_tests.py
+
+# Or run tests manually with pytest
+pytest tests/ -v
+
+# Run tests for a specific service
+pytest tests/test_rag_service.py -v
+pytest tests/test_scraper_service.py -v
+
+# Check test file syntax (without running tests)
+python check_test_syntax.py
+```
 
 ## Troubleshooting
 
